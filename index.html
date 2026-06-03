@@ -1,129 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wordle Unlimited</title>
-<style>
-:root{
-  --bg:#121213;
-  --tile:#3a3a3c;
-  --border:#565758;
-  --green:#6aaa64;
-  --yellow:#c9b458;
-  --gray:#3a3a3c;
-  --text:#fff;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:Arial,Helvetica,sans-serif;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  min-height:100vh;
-}
-h1{
-  margin:12px 0;
-  font-size:2rem;
-  border-bottom:1px solid #333;
-  width:100%;
-  text-align:center;
-  padding-bottom:10px;
-}
-#message{
-  height:24px;
-  margin:8px 0;
-  font-weight:bold;
-}
-#board{
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-  width:min(350px,95vw);
-}
-.row{
-  display:grid;
-  grid-template-columns:repeat(5,1fr);
-  gap:5px;
-}
-.tile{
-  aspect-ratio:1;
-  border:2px solid var(--border);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:2rem;
-  font-weight:bold;
-  text-transform:uppercase;
-  background:#121213;
-}
-.filled{border-color:#878a8c}
-.correct{background:var(--green);border-color:var(--green)}
-.present{background:var(--yellow);border-color:var(--yellow)}
-.absent{background:var(--gray);border-color:var(--gray)}
-.flip{
-  animation:flip .5s ease;
-}
-@keyframes flip{
-  0%{transform:rotateX(0)}
-  50%{transform:rotateX(90deg)}
-  100%{transform:rotateX(0)}
-}
-#keyboard{
-  margin-top:20px;
-  width:min(500px,98vw);
-}
-.krow{
-  display:flex;
-  justify-content:center;
-  margin-bottom:8px;
-  gap:6px;
-}
-.key{
-  background:#818384;
-  color:#fff;
-  border:none;
-  border-radius:4px;
-  height:58px;
-  min-width:43px;
-  font-weight:bold;
-  cursor:pointer;
-}
-.key.big{min-width:65px}
-.key.correct{background:var(--green)}
-.key.present{background:var(--yellow)}
-.key.absent{background:var(--gray)}
-#newGame{
-  margin:15px;
-  padding:10px 18px;
-  display:none;
-  cursor:pointer;
-}
-@media(max-width:500px){
-  .tile{font-size:1.6rem}
-  .key{height:50px;min-width:28px;font-size:.8rem}
-}
-</style>
-</head>
-<body>
-
-<h1>WORDLE</h1>
-<div id="message"></div>
-<div id="board"></div>
-<div id="keyboard"></div>
-<button id="newGame">New Game</button>
-
-<script>
 /* ==========================================================
-   WORD LIST
-   In a production version this array can contain thousands
-   of words. A large built-in dictionary is generated below.
+   WORDLE WORD LIST
+   ----------------------------------------------------------
+   PASTE YOUR ENTIRE WORD LIST BETWEEN THE [ and ] BELOW.
+   Example:
+
+   const WORDS = [
+     "about",
+     "other",
+     "which",
+     "their"
+   ];
+
+   The game will automatically use these words both
+   as valid guesses and possible answers.
    ========================================================== */
-function generateWordList(){
-  const base = [
+
+const WORDS = [
+
 "about","above","abuse","actor","acute","admit","adopt","adult","after","again","agent","agree",
 "ahead","alarm","album","alert","alike","alive","allow","alone","along","alter","among","anger",
 "angle","angry","apart","apple","apply","arena","argue","arise","array","aside","asset","audio",
@@ -165,230 +58,604 @@ function generateWordList(){
 "usual","valid","value","video","virus","visit","vital","voice","waste","watch","water","wheel",
 "where","which","while","white","whole","whose","woman","women","world","worry","worse","worst",
 "worth","would","wound","write","wrong","wrote","yield","young","youth"
+
+];
+
+
+/* ==========================================================
+   CONFIG
+   ========================================================== */
+
+const MAX_GUESSES = 6;
+
+let answer = "";
+let currentGuess = "";
+let solved = false;
+let rows = [];
+
+/* ==========================================================
+   RANDOM ANSWER
+   ========================================================== */
+
+function getRandomAnswer() {
+  return WORDS[
+    Math.floor(
+      Math.random() * WORDS.length
+    )
   ];
-
-  /* Expand list so the game has a large built-in dictionary. */
-  const words = [...new Set(base)];
-  return words;
 }
 
-const WORDS = generateWordList();
+/* ==========================================================
+   VALIDATE WORD
+   ========================================================== */
 
-let answer="";
-let currentGuess="";
-let solved=false;
-let rows=[];
-
-/* Pick a random answer */
-function getRandomAnswer(){
-  return WORDS[Math.floor(Math.random()*WORDS.length)];
+function validateGuess(word) {
+  return WORDS.includes(
+    word.toLowerCase()
+  );
 }
 
-/* Validate dictionary word */
-function validateGuess(word){
-  return WORDS.includes(word.toLowerCase());
-}
+/* ==========================================================
+   WORDLE EVALUATION
+   ========================================================== */
 
-/* Duplicate-letter handling exactly like Wordle */
-function evaluateGuess(guess, answer){
-  const result = Array(5).fill("absent");
-  const answerLetters = answer.split("");
+function evaluateGuess(
+  guess,
+  answer
+) {
 
-  for(let i=0;i<5;i++){
-    if(guess[i]===answer[i]){
-      result[i]="correct";
-      answerLetters[i]=null;
+  const result =
+    Array(5).fill("absent");
+
+  const answerLetters =
+    answer.split("");
+
+  /* Greens */
+  for (let i = 0; i < 5; i++) {
+
+    if (guess[i] === answer[i]) {
+
+      result[i] = "correct";
+
+      answerLetters[i] = null;
     }
   }
 
-  for(let i=0;i<5;i++){
-    if(result[i]==="correct") continue;
-    const idx = answerLetters.indexOf(guess[i]);
-    if(idx>-1){
-      result[i]="present";
-      answerLetters[idx]=null;
+  /* Yellows */
+  for (let i = 0; i < 5; i++) {
+
+    if (
+      result[i] === "correct"
+    ) continue;
+
+    const index =
+      answerLetters.indexOf(
+        guess[i]
+      );
+
+    if (index !== -1) {
+
+      result[i] = "present";
+
+      answerLetters[index] =
+        null;
     }
   }
+
   return result;
 }
 
-/* Draw board */
-function renderBoard(){
-  const board=document.getElementById("board");
-  board.innerHTML="";
+/* ==========================================================
+   MESSAGE
+   ========================================================== */
 
-  rows.forEach(r=>{
-    const row=document.createElement("div");
-    row.className="row";
+function showMessage(text) {
 
-    for(let i=0;i<5;i++){
-      const tile=document.createElement("div");
-      tile.className="tile";
-      tile.textContent=r.word[i]||"";
+  const message =
+    document.getElementById(
+      "message"
+    );
 
-      if(r.state){
-        tile.classList.add(r.state[i],"flip");
-      }else if(r.word[i]){
-        tile.classList.add("filled");
+  if (message) {
+    message.textContent = text;
+  }
+}
+
+/* ==========================================================
+   BOARD
+   ========================================================== */
+
+function renderBoard() {
+
+  const board =
+    document.getElementById(
+      "board"
+    );
+
+  board.innerHTML = "";
+
+  for (
+    let rowIndex = 0;
+    rowIndex < MAX_GUESSES;
+    rowIndex++
+  ) {
+
+    const row =
+      document.createElement(
+        "div"
+      );
+
+    row.className = "row";
+
+    const savedRow =
+      rows[rowIndex];
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      const tile =
+        document.createElement(
+          "div"
+        );
+
+      tile.className =
+        "tile";
+
+      if (savedRow) {
+
+        tile.textContent =
+          savedRow.word[col] || "";
+
+        if (savedRow.state) {
+
+          tile.classList.add(
+            savedRow.state[col]
+          );
+
+          if (
+            !savedRow.animated
+          ) {
+            tile.classList.add(
+              "flip"
+            );
+          }
+        }
+
+      } else if (
+        rowIndex === rows.length &&
+        !solved
+      ) {
+
+        tile.textContent =
+          currentGuess[col] || "";
+
+        if (
+          currentGuess[col]
+        ) {
+          tile.classList.add(
+            "filled"
+          );
+        }
       }
 
       row.appendChild(tile);
     }
+
     board.appendChild(row);
-  });
-
-  if(!solved){
-    const active=document.createElement("div");
-    active.className="row";
-
-    for(let i=0;i<5;i++){
-      const tile=document.createElement("div");
-      tile.className="tile";
-      tile.textContent=currentGuess[i]||"";
-      if(currentGuess[i]) tile.classList.add("filled");
-      active.appendChild(tile);
-    }
-    board.appendChild(active);
   }
-}
 
-/* Keyboard coloring priority */
-const priority={absent:1,present:2,correct:3};
-
-function updateKeyboard(word,state){
-  [...word].forEach((ch,i)=>{
-    const key=document.querySelector(`[data-key="${ch}"]`);
-    const existing=key.dataset.state||"";
-    if(!existing || priority[state[i]]>priority[existing]){
-      key.dataset.state=state[i];
-      key.classList.remove("correct","present","absent");
-      key.classList.add(state[i]);
-    }
+  rows.forEach(row => {
+    row.animated = true;
   });
 }
 
-function showMessage(text){
-  document.getElementById("message").textContent=text;
+/* ==========================================================
+   KEYBOARD COLORS
+   ========================================================== */
+
+const priority = {
+  absent: 1,
+  present: 2,
+  correct: 3
+};
+
+function updateKeyboard(
+  word,
+  state
+) {
+
+  [...word].forEach(
+    (letter, index) => {
+
+      const key =
+        document.querySelector(
+          `[data-key="${letter}"]`
+        );
+
+      if (!key) return;
+
+      const current =
+        key.dataset.state;
+
+      if (
+        !current ||
+        priority[state[index]] >
+          priority[current]
+      ) {
+
+        key.dataset.state =
+          state[index];
+
+        key.classList.remove(
+          "correct",
+          "present",
+          "absent"
+        );
+
+        key.classList.add(
+          state[index]
+        );
+      }
+    }
+  );
 }
 
-function submitGuess(){
-  if(currentGuess.length!==5){
-    showMessage("Enter 5 letters");
+/* ==========================================================
+   SUBMIT GUESS
+   ========================================================== */
+
+function submitGuess() {
+
+  if (solved) return;
+
+  if (
+    currentGuess.length !== 5
+  ) {
+
+    showMessage(
+      "Enter 5 letters"
+    );
+
     return;
   }
 
-  const guess=currentGuess.toLowerCase();
+  const guess =
+    currentGuess.toLowerCase();
 
-  if(!validateGuess(guess)){
-    showMessage("Not in word list");
+  if (
+    !validateGuess(guess)
+  ) {
+
+    showMessage(
+      "Not in word list"
+    );
+
     return;
   }
 
-  const state=evaluateGuess(guess,answer);
+  const state =
+    evaluateGuess(
+      guess,
+      answer
+    );
 
-  rows.push({word:guess,state});
-  updateKeyboard(guess,state);
+  rows.push({
+    word: guess,
+    state,
+    animated: false
+  });
 
-  if(guess===answer){
-    solved=true;
-    showMessage("You guessed it!");
-    document.getElementById("newGame").style.display="block";
-  }else{
-    showMessage("");
+  updateKeyboard(
+    guess,
+    state
+  );
+
+  currentGuess = "";
+
+  if (guess === answer) {
+
+    solved = true;
+
+    showMessage(
+      "Correct! 🎉"
+    );
+
+    const retry =
+      document.getElementById(
+        "retryBtn"
+      );
+
+    if (retry) {
+      retry.style.display =
+        "inline-flex";
+    }
   }
 
-  currentGuess="";
+  else if (
+    rows.length >=
+    MAX_GUESSES
+  ) {
+
+    solved = true;
+
+    showMessage(
+      "Wrong! The word was: " +
+        answer.toUpperCase()
+    );
+
+    const retry =
+      document.getElementById(
+        "retryBtn"
+      );
+
+    if (retry) {
+      retry.style.display =
+        "inline-flex";
+    }
+  }
+
   renderBoard();
 }
 
-function startNewGame(){
-  answer=getRandomAnswer();
-  currentGuess="";
-  rows=[];
-  solved=false;
+/* ==========================================================
+   NEW GAME
+   ========================================================== */
+
+function startNewGame() {
+
+  answer =
+    getRandomAnswer();
+
+  currentGuess = "";
+
+  rows = [];
+
+  solved = false;
+
   showMessage("");
-  document.getElementById("newGame").style.display="none";
 
-  document.querySelectorAll(".key").forEach(k=>{
-    k.classList.remove("correct","present","absent");
-    k.dataset.state="";
-  });
+  document
+    .querySelectorAll(".key")
+    .forEach(key => {
+
+      key.classList.remove(
+        "correct",
+        "present",
+        "absent"
+      );
+
+      key.dataset.state = "";
+    });
+
+  const retry =
+    document.getElementById(
+      "retryBtn"
+    );
+
+  if (retry) {
+    retry.style.display =
+      "none";
+  }
 
   renderBoard();
 }
 
-function createKeyboard(){
-  const layout=[
+/* ==========================================================
+   KEYBOARD
+   ========================================================== */
+
+function createKeyboard() {
+
+  const layout = [
     "QWERTYUIOP",
     "ASDFGHJKL",
     "ENTERZXCVBNM⌫"
   ];
 
-  const kb=document.getElementById("keyboard");
+  const keyboard =
+    document.getElementById(
+      "keyboard"
+    );
 
-  layout.forEach(rowText=>{
-    const row=document.createElement("div");
-    row.className="krow";
+  keyboard.innerHTML = "";
 
-    if(rowText.startsWith("ENTER")){
-      const enter=document.createElement("button");
-      enter.className="key big";
-      enter.textContent="ENTER";
-      enter.onclick=submitGuess;
-      row.appendChild(enter);
+  layout.forEach(text => {
 
-      "ZXCVBNM".split("").forEach(c=>{
-        row.appendChild(letterKey(c));
-      });
+    const row =
+      document.createElement(
+        "div"
+      );
 
-      const back=document.createElement("button");
-      back.className="key big";
-      back.textContent="⌫";
-      back.onclick=()=>{currentGuess=currentGuess.slice(0,-1);renderBoard();}
-      row.appendChild(back);
-    }else{
-      rowText.split("").forEach(c=>row.appendChild(letterKey(c)));
+    row.className =
+      "krow";
+
+    if (
+      text.startsWith(
+        "ENTER"
+      )
+    ) {
+
+      const enter =
+        document.createElement(
+          "button"
+        );
+
+      enter.className =
+        "key big";
+
+      enter.textContent =
+        "ENTER";
+
+      enter.onclick =
+        submitGuess;
+
+      row.appendChild(
+        enter
+      );
+
+      "ZXCVBNM"
+        .split("")
+        .forEach(letter => {
+
+          row.appendChild(
+            letterKey(letter)
+          );
+        });
+
+      const back =
+        document.createElement(
+          "button"
+        );
+
+      back.className =
+        "key big";
+
+      back.textContent =
+        "⌫";
+
+      back.onclick = () => {
+
+        if (solved) return;
+
+        currentGuess =
+          currentGuess.slice(
+            0,
+            -1
+          );
+
+        renderBoard();
+      };
+
+      row.appendChild(
+        back
+      );
+
+    } else {
+
+      text
+        .split("")
+        .forEach(letter => {
+
+          row.appendChild(
+            letterKey(letter)
+          );
+        });
     }
 
-    kb.appendChild(row);
+    keyboard.appendChild(
+      row
+    );
   });
 }
 
-function letterKey(letter){
-  const btn=document.createElement("button");
-  btn.className="key";
-  btn.textContent=letter;
-  btn.dataset.key=letter.toLowerCase();
-  btn.onclick=()=>{
-    if(solved) return;
-    if(currentGuess.length<5){
-      currentGuess+=letter.toLowerCase();
+function letterKey(letter) {
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+  button.className =
+    "key";
+
+  button.textContent =
+    letter;
+
+  button.dataset.key =
+    letter.toLowerCase();
+
+  button.onclick = () => {
+
+    if (solved) return;
+
+    if (
+      currentGuess.length < 5
+    ) {
+
+      currentGuess +=
+        letter.toLowerCase();
+
       renderBoard();
     }
   };
-  return btn;
+
+  return button;
 }
 
-document.addEventListener("keydown",e=>{
-  if(solved) return;
+/* ==========================================================
+   PHYSICAL KEYBOARD
+   ========================================================== */
 
-  if(/^[a-zA-Z]$/.test(e.key)){
-    if(currentGuess.length<5){
-      currentGuess+=e.key.toLowerCase();
+document.addEventListener(
+  "keydown",
+  event => {
+
+    if (solved) return;
+
+    if (
+      /^[a-zA-Z]$/.test(
+        event.key
+      )
+    ) {
+
+      if (
+        currentGuess.length < 5
+      ) {
+
+        currentGuess +=
+          event.key.toLowerCase();
+
+        renderBoard();
+      }
+    }
+
+    else if (
+      event.key ===
+      "Backspace"
+    ) {
+
+      currentGuess =
+        currentGuess.slice(
+          0,
+          -1
+        );
+
       renderBoard();
     }
-  }else if(e.key==="Backspace"){
-    currentGuess=currentGuess.slice(0,-1);
-    renderBoard();
-  }else if(e.key==="Enter"){
-    submitGuess();
-  }
-});
 
-document.getElementById("newGame").addEventListener("click",startNewGame);
+    else if (
+      event.key ===
+      "Enter"
+    ) {
+
+      submitGuess();
+    }
+  }
+);
+
+/* ==========================================================
+   RETRY BUTTON
+   ========================================================== */
+
+const retryBtn =
+  document.getElementById(
+    "retryBtn"
+  );
+
+if (retryBtn) {
+
+  retryBtn.addEventListener(
+    "click",
+    startNewGame
+  );
+}
+
+/* ==========================================================
+   START
+   ========================================================== */
 
 createKeyboard();
 startNewGame();
-</script>
-</body>
-</html>
